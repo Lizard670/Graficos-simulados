@@ -137,7 +137,7 @@ def carregar_aluno_prova(db_config, caminho_arquivo=None, indexes=None):
             continue
 
         # Cria o comando que insere todas as provas
-        comando = f"use {db_config["database"]};\n"
+        comando = ""
         for id_prova, index_prova in provas.items():
             comando += f"insert into AlunoProva (idAluno, idProva, Nota) values ('{id_aluno}', '{id_prova}', '{row[index_prova]}');\n"
 

@@ -56,7 +56,7 @@ def inserir_tabela(db_config, nome_tabela, entidade, conexao=None, commit=True):
         colunas += coluna + ", "
         valores_colunas += "'" + valor + "', "
 
-    comando_insert = f"use {db_config["database"]}; insert into {nome_tabela} ({colunas[0:-2]}) values ({valores_colunas[0:-2]})"
+    comando_insert = f"insert into {nome_tabela} ({colunas[0:-2]}) values ({valores_colunas[0:-2]})"
     try:
         cursor.execute(comando_insert)
         if commit:

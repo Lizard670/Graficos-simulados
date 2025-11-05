@@ -22,7 +22,7 @@ def criar_tabelas(db_config):
     conexao = mysql.connector.connect(**db_config)
     cursor = conexao.cursor()
 
-    comando = f"use {db_config["database"]};\n" + """
+    comando = """
     create table Curso(
         idCurso int primary key not null,
         Nome varchar(40) unique not null
@@ -80,11 +80,12 @@ def criar_tabelas(db_config):
     
     create table AlunoProva(
         idProva int,
+        idAluno int,
         Matricula int,
         Nota int,
         primary key(idProva, Matricula),
         foreign key(idProva) references Prova (idProva),
-        foreign key(Matricula) references Aluno (Matricula)
+        foreign key(idAluno) references Aluno (idAluno)
     );
     """
 
