@@ -58,6 +58,7 @@ create table Prova
 
 create table AlunoProva(
 	idProva int,
+	idAluno int,
 	Matricula int,
 	Nota int,
 	primary key(idProva, Matricula),

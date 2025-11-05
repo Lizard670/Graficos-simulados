@@ -1,11 +1,11 @@
-use simulados;
+use Simulados;
 
-insert into curso (idCurso, nome) values 
+insert into Curso (idCurso, nome) values 
 	('1', 'TI'),
 	('2', 'TA'),
 	('3', 'TB');
 
-insert into turma (idTurma, nome, idCurso) values 
+insert into Turma (idTurma, nome, idCurso) values 
 	('1', '3TIA', '1'),
 	('2', '3TIB', '1'),
 	('3', '4TI',  '1'),
@@ -36,7 +36,7 @@ insert into Prova (idSimulado, idProva, idAssunto) values
 	('1',  '2', '2'),
 	('1',  '3', '3'),
 	('2',  '4', '1'),
-	('2',  '6', '2'),
+	('2',  '5', '2'),
 	('2',  '6', '3'),
 	('3',  '7', '1'),
 	('3',  '8', '2'),
