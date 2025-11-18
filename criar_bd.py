@@ -87,6 +87,13 @@ def criar_tabelas(db_config):
         foreign key(idProva) references Prova (idProva),
         foreign key(idAluno) references Aluno (idAluno)
     );
+
+    CREATE VIEW ProvasAluno AS 
+        select count(case when AlunoProva.Nota = 0 and Prova.idAssunto != 1 then 1 end) as Faltas,
+            AlunoProva.idAluno
+        from AlunoProva 
+            inner join Prova on AlunoProva.idProva = Prova.idProva
+        group by AlunoProva.idAluno;
     """
 
     try:
