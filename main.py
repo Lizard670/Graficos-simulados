@@ -33,11 +33,11 @@ class GeradorGraficos:
         # Puxa do banco de dados o nome das turmas, cursos e assuntos
         cursor = self.conexao.cursor()
         cursor.execute(f"select Nome, idTurma from Turma")
-        self.turmas = {turma[0]: turma[1] for turma in cursor.fetchall()}
+        self.turmas = {turma[1]: turma[0] for turma in cursor.fetchall()}
         cursor.execute(f"select Nome, idCurso from Curso")
-        self.cursos = {curso[0]: curso[1] for curso in cursor.fetchall()}
+        self.cursos = {curso[1]: curso[0] for curso in cursor.fetchall()}
         cursor.execute(f"select Nome, idAssunto from Assunto")
-        self.assuntos = {assunto[0]: assunto[1] for assunto in cursor.fetchall()}
+        self.assuntos = {assunto[1]: assunto[0] for assunto in cursor.fetchall()}
         cursor.close()
 
         # Certifica que as pastas para salvar os gráficos existem
@@ -45,10 +45,10 @@ class GeradorGraficos:
         self.pasta_graficos = nome_pasta
         if not os.path.exists(self.pasta_graficos):
             os.makedirs(self.pasta_graficos)
-        for curso in self.cursos.keys():
+        for curso in self.cursos.values():
             if not os.path.exists(os.path.join(self.pasta_graficos, curso)):
                 os.makedirs(os.path.join(self.pasta_graficos, curso))
-            for turma in self.turmas.keys():
+            for turma in self.turmas.values():
                 if curso not in turma:
                     continue
                 if not os.path.exists(os.path.join(self.pasta_graficos, curso, turma)):
@@ -61,20 +61,22 @@ class GeradorGraficos:
         # Create interactivity between dropdown component and graph
         @self.app.callback(
             Output('bar-graph-plotly', 'figure'),
-            Output('grid', 'defaultColDef'),
             Input('tipo_grafico', 'value'),
             [Input('cursos_filtro', 'value')],
+            [Input('anos_filtro', 'value')],
             [Input('turmas_filtro', 'value')],
+            Input('tipo_agrupar', 'value'),
         )
 
-        def plot_data(tipo, cursos, turmas):
+        def plot_data(tipo, cursos, anos, turmas, tipo_agrupar):
             fig_bar_plotly = None
             cursos = [] if cursos is None else cursos
+            anos = [] if anos is None else anos
             turmas = [] if turmas is None else turmas
 
             match tipo:
                 case "Faltas alunos":      
-                    fig_bar_plotly = self.plotar_faltas_alunos(cursos, turmas)
+                    fig_bar_plotly = self.plotar_faltas_alunos(cursos, anos, turmas, tipo_agrupar)
                 case "Média":
                     df = pd.read_sql('SELECT idProva, avg(Nota) AS Média FROM AlunoProva GROUP BY idProva', con=self.conexao)
 
@@ -90,7 +92,7 @@ class GeradorGraficos:
                 ]
             }
 
-            return fig_bar_plotly, {'cellStyle': my_cellStyle}
+            return fig_bar_plotly
         
         self.app.run(debug=False, port=8002)
 
@@ -121,6 +123,13 @@ class GeradorGraficos:
                 ], width=1),
     
                 dbc.Col([
+                    html.H2("Anos", style={'textAlign':'center'}),
+                    dcc.Checklist(
+                        id='anos_filtro',
+                        options=[3, 4])
+                ], width=1),
+    
+                dbc.Col([
                     html.H2("Turmas", style={'textAlign':'center'}),
                     dcc.Checklist(
                         id='turmas_filtro',
@@ -132,7 +141,15 @@ class GeradorGraficos:
                     dcc.Checklist(
                         id='assuntos_filtro',
                         options=self.assuntos)
-                ], width=1)
+                ], width=2),
+    
+                dbc.Col([
+                    html.H2("Agrupar por", style={'textAlign':'center'}),
+                    dcc.RadioItems(
+                        id='tipo_agrupar',
+                        value="Curso",
+                        options=["Curso", "Ano", "Turma"])
+                ], width=2)
             ]),
 
             dbc.Row([
@@ -144,15 +161,7 @@ class GeradorGraficos:
             dbc.Row([
                 dbc.Col([
                     dcc.Graph(id='bar-graph-plotly', figure={})
-                ], width=12, md=6),
-                dbc.Col([
-                    dag.AgGrid(
-                        id='grid',
-                        rowData=df.to_dict("records"),
-                        columnDefs=[{"field": i} for i in df.columns],
-                        columnSize="sizeToFit",
-                    )
-                ], width=12, md=6),
+                ], width=12),
             ]),
         ])
 
@@ -165,33 +174,46 @@ class GeradorGraficos:
         print(f"Gráfico salvo: {caminho}")
 
 
-    def plotar_faltas_alunos(self, cursos, turmas):
+    def plotar_faltas_alunos(self, cursos, anos, turmas, agrupar_por):
         """Cria um gráfico de barras que mostra a quantidade de cada tipo de falta"""
         tem_cursos = len(cursos) > 0
+        tem_anos = len(anos) > 0
         tem_turmas = len(turmas) > 0
-        query = "select Faltas, count(Faltas) as Quantidade from ProvasAluno "
+        query = "select Faltas, Curso.Nome as Curso, Turma.Ano as Ano, Turma.Nome as Turma from ProvasAluno "
         # Junções para pegar turma e curso
         query += "inner join Aluno on ProvasAluno.idAluno = Aluno.idAluno "
         query += "inner join Turma on Aluno.idTurma = Turma.idTurma "
         query += "inner join Curso on Turma.idCurso = Curso.idCurso "
 
-        # Adiciona as condições de turma e curso
-        query += "where " if tem_turmas or tem_cursos else ""
-        query += f"Turma.idTurma in ('{'\', \''.join(turmas)}') " if tem_turmas else ""
-        query += "and " if tem_turmas and tem_cursos else ""
-        query += f"Curso.idCurso in ('{'\', \''.join(cursos)}') " if tem_cursos else ""
-            
-        query += "group by Faltas;"
+        # Adiciona as condições de turma, ano e curso
+        if tem_turmas:
+            query += f"where Turma.idTurma in ('{'\', \''.join(turmas)}') "
+        elif tem_anos:
+            query += f"where Turma.Ano in ('{'\', \''.join(anos)}') "
+        elif tem_cursos:
+            query += f"where Turma.idCurso in ('{'\', \''.join(cursos)}') "
+        
 
         # Executa o query e pega os valores do mysql
         df = pd.read_sql(query, con=self.conexao)
-        # Converte o número de falta em uma string correspondente
-        df["Faltas"] = list(self.categorias_faltas.keys())[:len(df["Faltas"])]
+        # Converte o número de faltas e ano em uma string correspondente
+        for i, linha_antiga in df.iterrows():
+            df['Faltas'] = df["Faltas"].astype(str)
+            df.at[i, "Faltas"] = list(self.categorias_faltas.keys())[linha_antiga["Faltas"]]
+
+            df['Ano'] = df["Ano"].astype(str)
+            df.at[i, "Ano"] = f"{linha_antiga["Ano"]}º"
         # Pega as cores salvas e corta o final pra que tenha a mesma quantidade de itens que o DF
-        cores = list(self.categorias_faltas.values())[:len(df["Faltas"])]
+        cores = list(self.categorias_faltas.values())
         
-        # Cria e retorna o gráfico de barras das Faltas
-        return px.bar(df, x="Faltas", y="Quantidade", color="Faltas", color_discrete_sequence=cores)
+        # Cria o gráfico de barras das Faltas
+        grafico = px.histogram(df, text_auto=True, histfunc="count", 
+                               x=agrupar_por, y="Faltas", 
+                               color_discrete_sequence=cores, color="Faltas")
+        # Muda o eixo Y de "count" para "Quantidade de alunos"
+        grafico.update_layout(yaxis_title="Quantidade de alunos")
+
+        return grafico
 
 
     def plotar_media(self, cursos, turmas):
